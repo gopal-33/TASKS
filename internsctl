@@ -1,0 +1,162 @@
+#!/bin/bash
+
+
+function help() {
+    echo "Usage: internsctl [OPTIONS]... [FILE]..."
+    echo "Custom Linux Command for Operations "
+    echo ""
+    echo "Options:"
+    echo "  --help, 					show the available operations "
+    echo "  --version,					display the current version "
+    echo "  cpu getinfo, 					display the cpu information"
+    echo "  memory getinfo, 	 			display the memory information"
+    echo "  user create <username>  			create a new user"
+    echo "  user list         				list all users"
+    echo "  user list --sudo-only				list users with sudo access"
+    echo "  file getinfo <file_name> 			get file information"
+    echo "  file getinfo --size <file_name>		display the file size"
+    echo "  file getinfo --permissions|-p <file_name>	display the file permissions"
+    echo "  file getinfo --owner|-o <file_name>		display the file owner"
+    echo "  file getinfo --last-modified|-m <file_name>	display the last modified details"
+}
+
+
+function version() {
+    echo "internsctl v0.1.0"
+}
+
+
+function cpu_info() {
+    lscpu
+}
+function memory_info() {
+    free -h
+}
+
+function create_user() {
+    if [[ -z "$1" ]]; then
+        echo "Error: Missing username. Usage: internsctl user create <username>"
+        exit 1
+    fi
+    if id "$1" &>/dev/null; then
+	 echo "Error: User $1 already exists"
+	 exit 1
+     fi
+     sudo useradd -m "$1"
+	if [[ $? -eq 0 ]]; then
+     		echo "User '$1' created successfully."
+	else
+    		 echo " User Creation Failed."
+	fi
+}
+
+
+function list_users() {
+    #cut -d: -f1 /etc/passwd
+    awk -F: '($3 >= 1000 && $3 < 65534) {print $1}' /etc/passwd
+}
+
+
+function list_sudo_users() {
+   	#getent group sudo | cut -d: -f4 | tr ',' '\n'
+	getent group sudo | awk -F: '{print $4}'
+}
+
+file_getinfo() { 
+	echo "$1"
+	FILE="$1"
+	if [[ -z "$FILE" ]]; 
+	then 
+		echo "Error: File name required" 
+		exit 1 
+	fi 
+	if [[ ! -e "$FILE" ]]; 
+	then 
+		echo "Error: File does not exist" 
+		exit 1 
+	fi 
+
+	case "$2" in 
+	    --size|-s)
+		 stat -c %s "$1" 
+		 ;; 
+	    --permissions|-p) 
+		 stat -c %A "$1"
+		 ;; 
+	    --owner|-o) 
+		 stat -c %U "$1"
+		 ;; 
+	    --last-modified|-m)
+		 stat -c %y "$1"
+		 ;; 
+	     "")
+            echo "File: $FILE"
+            echo "Access: $(stat -c %A "$FILE")"
+            echo "Size(B): $(stat -c %s "$FILE")"
+            echo "Owner: $(stat -c %U "$FILE")"
+            echo "Modify: $(stat -c %y "$FILE")"
+            ;;
+	     *)
+            echo "Invalid file command"
+            exit 1
+            ;;
+	esac 
+	exit 0
+} 
+
+
+
+case "$1" in
+    --help)
+        help
+        ;;
+    --version)
+        version
+        ;;
+    cpu)
+        if [ "$2" == "getinfo" ]; then
+            cpu_info
+        else
+            echo "Invalid subcommand for 'cpu'. Use 'internsctl cpu getinfo'."
+            exit 1
+        fi
+        ;;
+   memory)
+        if [ "$2" == "getinfo" ]; then
+            memory_info
+        else
+            echo "Invalid subcommand for 'memory'. Use 'internsctl memory getinfo'."
+            exit 1
+        fi
+        ;;
+   user)
+   if [ "$2" == "create" ]; then
+            create_user "$3"
+        elif [ "$2" == "list" ]; then
+		    if [ -z "$3" ]; then
+			list_users
+		    elif [ "$3" == "--sudo-only" ]; then
+			if [ -z "$4" ]; then
+		        list_sudo_users
+		    	else
+			echo "Invalid subcommand for 'user list'. Use 'internsctl user list' or 'internsctl user list [--sudo-only]'"
+		         fi
+		     else
+			echo "Invalid subcommand for 'user'. Use 'internsctl user create <username>' or 'internsctl user list [--sudo-only]'."
+			fi
+       	else
+            echo "Invalid subcommand for 'user'. Use 'internsctl user create <username>' or 'internsctl user list [--sudo-only]'."
+            exit 1
+        fi
+        ;;
+    file)
+    	if [ "$2" == "getinfo" ]; then
+    	    file_getinfo "$3" "$4" 
+    	 fi  
+    	 ;;
+       *)
+        echo "Invalid option. Use 'internsctl --help' for usage guidelines."
+        exit 1
+        ;;
+    
+esac
